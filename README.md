@@ -12,7 +12,7 @@ python main.py input.json output.json -m mbert [-t] 0.4 [-p]
 ## Input parameters:
 
 - input file. Has to be either a transcript JSON with `message_list` field or a list of message JSONs with
-  fields `start_time', `end_time`, `text`.
+  fields `start_time`, `end_time`, `text`.
 - output_file. The result will be written as a list of timestamp dicts, each of which denotes the start and the end
   times of each chapter
 - -m (model). Available options are `xlm` or `mbert` (bert-multilingual-cased will be used)
@@ -22,3 +22,7 @@ python main.py input.json output.json -m mbert [-t] 0.4 [-p]
 - [Optional] -p (preprocessing). Pass this argument to perform preprocessing on the input data. Preprocessing removes
   fillers and very short sentences from the dialogue. Can help if the data is noisy but can also drop potentially useful
   information. Disabled by default.
+
+## Internal usage
+
+The entry point function for segmentation task is `segmentation.segment_text`
