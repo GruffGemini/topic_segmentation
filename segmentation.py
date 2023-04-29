@@ -5,7 +5,7 @@ from typing import NamedTuple, Optional, Literal, List, Dict
 from tqdm.auto import tqdm
 
 from dataset import *
-from models import MBertModel, XLMModel, CommonModelName
+from models import MBertModel, SBertModel, CommonModelName
 
 
 class TextTilingHyperparameters(NamedTuple):
@@ -20,7 +20,7 @@ class TopicSegmentationConfig(NamedTuple):
     MAX_SEGMENTS_CAP__AVERAGE_SEGMENT_LENGTH: int = 60
 
 
-def segment_text(text_data: Union[dict, str, list], model: Literal[CommonModelName.XLM, CommonModelName.MBERT],
+def segment_text(text_data: Union[dict, str, list], model: Literal[CommonModelName.SBERT, CommonModelName.MBERT],
                  threshold: float = 0.5) -> List[Dict[str, float]]:
     """
     The main function that performs text segmentation. Returns a list of timestamps for every chapter.
@@ -33,8 +33,8 @@ def segment_text(text_data: Union[dict, str, list], model: Literal[CommonModelNa
             - a string that can be converted to any of the above two types
 
         - model
-        A literal that determines what kind of embeddings will be used for segmentation. XLM and bert-multilingual-cased
-        are supported
+        A literal that determines what kind of embeddings will be used for segmentation. SBERT and
+        bert-multilingual-cased are supported
 
         - threshold
         A threshold that determines how significant should be the change in dialogue semantics to regard it as a topic
@@ -51,8 +51,8 @@ def segment_text(text_data: Union[dict, str, list], model: Literal[CommonModelNa
 
     if model == CommonModelName.MBERT:
         model = MBertModel(threshold=threshold)
-    elif model == CommonModelName.XLM:
-        model = XLMModel(threshold=threshold)
+    elif model == CommonModelName.SBERT:
+        model = SBertModel(threshold=threshold)
     else:
         raise Exception('Unknown model name!')
 
@@ -155,6 +155,10 @@ def topic_segmentation_bert(
         meeting_duration,
         topic_segmentation_configs=topic_segmentation_configs,
     )
+
+    side_window = textiling_hyperparameters.SMOOTHING_WINDOW + textiling_hyperparameters.SENTENCE_COMPARISON_WINDOW
+    segments = [i + side_window for i in segments]
+
     if len(segments) == 0:
         segments = np.empty(0, int)
     segments = np.append(segments, 0)
