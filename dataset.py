@@ -5,6 +5,10 @@ from typing import Union
 START_COL_NAME = "starttime"
 END_COL_NAME = "endtime"
 CAPTION_COL_NAME = "text"
+SPEAKER_COL_NAME = 'speaker'
+
+RAW_START_COL_NAME = 'start_time'
+RAW_END_COL_NAME = 'end_time'
 
 
 def preprocessing(df, caption_col_name):
@@ -46,14 +50,14 @@ def create_dataframe(text_data: Union[dict, list]) -> DataFrame:
     for message in message_list:
         current_sentence.append(message['text'].strip())
         if not start_time:
-            start_time = message['start_time']
+            start_time = float(message[RAW_START_COL_NAME])
         if current_sentence[-1][-1] not in '.?!':
             continue
 
         sentence = ' '.join(current_sentence)
         if ',' in sentence:
             sentence = f'"{sentence}"'
-        caption_data.append([sentence, start_time, message['end_time']])
+        caption_data.append([sentence, start_time, float(message[RAW_END_COL_NAME]), message['speaker']])
         current_sentence = []
         start_time = None
 
@@ -61,6 +65,6 @@ def create_dataframe(text_data: Union[dict, list]) -> DataFrame:
             sentence = ' '.join(current_sentence)
             if ',' in sentence:
                 sentence = f'"{sentence}"'
-            caption_data.append([sentence, start_time, message['end_time']])
+            caption_data.append([sentence, start_time, message['end_time'], message['speaker']])
 
-    return DataFrame(data=caption_data, columns=[CAPTION_COL_NAME, START_COL_NAME, END_COL_NAME])
+    return DataFrame(data=caption_data, columns=[CAPTION_COL_NAME, START_COL_NAME, END_COL_NAME, SPEAKER_COL_NAME])

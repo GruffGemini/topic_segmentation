@@ -11,7 +11,7 @@ class CommonModelName(Enum):
 
 
 class SBertModel:
-    name = 'all-mpnet-base-v2'
+    name = 'paraphrase-multilingual-mpnet-base-v2'
     PARALLEL_INFERENCE_INSTANCES = 100
 
     def __init__(self, threshold: float):
@@ -37,7 +37,7 @@ class SBertModel:
 
 
 class MBertModel:
-    name = 'bert-base-multilingual-uncased'
+    name = 'bert-base-multilingual-cased'
     PARALLEL_INFERENCE_INSTANCES = 100
 
     def __init__(self, threshold: float):
