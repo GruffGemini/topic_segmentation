@@ -72,7 +72,8 @@ def segment_text(text_data: Union[dict, str, list], model: Literal[CommonModelNa
     else:
         side_window = (TextTilingHyperparameters().SMOOTHING_WINDOW +
                        TextTilingHyperparameters().SENTENCE_COMPARISON_WINDOW)
-        bert_features = [0] * side_window + bert_features + [0] * side_window
+        bert_features = [min(bert_features)] * side_window + bert_features + [min(bert_features)] * side_window
+        bert_features = normalize(bert_features)
 
         cue_phrases_features = get_cue_phrases_features(df=data, caption_col_name=CAPTION_COL_NAME)
         overlap_features = get_overlap_features(df=data,

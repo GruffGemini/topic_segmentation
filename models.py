@@ -2,7 +2,7 @@ import torch
 from enum import Enum
 from sentence_transformers import SentenceTransformer
 from torch.nn.functional import pad
-from transformers import BertModel, BertTokenizer
+from transformers import RobertaModel, RobertaTokenizer
 
 
 class CommonModelName(Enum):
@@ -37,15 +37,15 @@ class SBertModel:
 
 
 class MBertModel:
-    name = 'bert-base-multilingual-cased'
+    name = 'roberta-base'
     PARALLEL_INFERENCE_INSTANCES = 100
 
     def __init__(self, threshold: float):
         self.threshold = threshold
 
         # Initialize the tokenizer and model
-        self.tokenizer = BertTokenizer.from_pretrained(self.name)
-        self.model = BertModel.from_pretrained(self.name)
+        self.tokenizer = RobertaTokenizer.from_pretrained(self.name)
+        self.model = RobertaModel.from_pretrained(self.name)
 
         # Use a GPU if available
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

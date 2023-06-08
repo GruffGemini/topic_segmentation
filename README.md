@@ -6,13 +6,13 @@ and https://github.com/gdamaskinos/unsupervised_topic_segmentation
 ## Sample Usage:
 
 ```
-python main.py input.json output.json -m mbert [-t] 0.4 [-p]
+python main.py sample_input/ES2002c.json report.txt -t 0.6 -r human_report.txt -m sbert -f
 ```
 
 ## Input parameters:
 
 - input file. Has to be either a transcript JSON with `message_list` field or a list of message JSONs with
-  fields `start_time`, `end_time`, `text`.
+  fields `starttime`, `endtime`, `text`.
 - output_file. The result will be written as a list of timestamp dicts, each of which denotes the start and the end
   times of each chapter
 - -m (model). Available options are `sbert` or `mbert` (bert-multilingual-cased will be used)
@@ -22,6 +22,9 @@ python main.py input.json output.json -m mbert [-t] 0.4 [-p]
 - [Optional] -p (preprocessing). Pass this argument to perform preprocessing on the input data. Preprocessing removes
   fillers and very short sentences from the dialogue. Can help if the data is noisy but can also drop potentially useful
   information. Disabled by default.
+- [Optional] -r (human_report). Specify a path to a human-readable segmentation report.
+- [Optional] -f (features). Use linguistic features for segmentation. Is is recommended to enable this option for better
+  results. It is not recommended enabling preprocessing while using linguistic features.
 
 ## Internal usage
 

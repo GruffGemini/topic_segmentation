@@ -7,8 +7,8 @@ END_COL_NAME = "endtime"
 CAPTION_COL_NAME = "text"
 SPEAKER_COL_NAME = 'speaker'
 
-RAW_START_COL_NAME = 'start_time'
-RAW_END_COL_NAME = 'end_time'
+RAW_START_COL_NAME = 'starttime'
+RAW_END_COL_NAME = 'endtime'
 
 
 def preprocessing(df, caption_col_name):

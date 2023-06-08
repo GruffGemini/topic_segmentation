@@ -7,10 +7,7 @@ SMOOTHING_WINDOW = 3
 CUE_PHRASES = {'ok': 1, 'okay': 1, 'kay': 1, "'kay": 1, 'so': 0.82, 'and': 0.32, 'yeah': 0.31, 'well': 0.18,
                'right': 0.12, 'but': 0.11, 'alright': 0.08, 'now': 0.06, 'anyway': 0.04}
 JUNK_WORDS = ['uh', 'um', 'mm']
-FEATURE_WEIGHTS = [1, 0, 0, 0, 0]
-
-
-# FEATURE_WEIGHTS = [0.1, 0.35, 0.1, 0.35, 0.1]
+FEATURE_WEIGHTS = [0.1, 0.5, 0.1, 0.1, 0.2]
 
 
 def get_silence_features(df: pd.DataFrame, start_col_name: str, end_col_name: str) -> List[float]:
