@@ -1,11 +1,11 @@
 import json
-import numpy as np
 import torch
-from typing import NamedTuple, Optional, Literal, List, Dict
+from typing import NamedTuple, Optional, Literal, Dict
 from tqdm.auto import tqdm
 
 from dataset import *
-from models import MBertModel, XLMModel, CommonModelName
+from features import *
+from models import MBertModel, SBertModel, CommonModelName
 
 
 class TextTilingHyperparameters(NamedTuple):
@@ -18,10 +18,11 @@ class TopicSegmentationConfig(NamedTuple):
     TEXT_TILING: Optional[TextTilingHyperparameters] = TextTilingHyperparameters()
     MAX_SEGMENTS_CAP: bool = True
     MAX_SEGMENTS_CAP__AVERAGE_SEGMENT_LENGTH: int = 60
+    MIN_SEGMENT_LENGTH = 10
 
 
-def segment_text(text_data: Union[dict, str, list], model: Literal[CommonModelName.XLM, CommonModelName.MBERT],
-                 threshold: float = 0.5) -> List[Dict[str, float]]:
+def segment_text(text_data: Union[dict, str, list], model: Literal[CommonModelName.SBERT, CommonModelName.MBERT],
+                 human_report: str, threshold: float = 0.6, use_features=True) -> List[Dict[str, float]]:
     """
     The main function that performs text segmentation. Returns a list of timestamps for every chapter.
     Each timestamp is a dict with fields 'start_time' and 'end_time'. The times themselves are float numbers.
@@ -33,13 +34,17 @@ def segment_text(text_data: Union[dict, str, list], model: Literal[CommonModelNa
             - a string that can be converted to any of the above two types
 
         - model
-        A literal that determines what kind of embeddings will be used for segmentation. XLM and bert-multilingual-cased
-        are supported
+        A literal that determines what kind of embeddings will be used for segmentation. SBERT and
+        bert-multilingual-cased are supported
 
         - threshold
         A threshold that determines how significant should be the change in dialogue semantics to regard it as a topic
         change. Should be a real number between 0 and 1. 0 will create a lot of small chapters. 1 will cause the entire
         dialogue to be a single chapter. Default value is 0.5
+
+        - use_features
+        If set to true, linguistic features will be used for segmentation in addition to BERT embeddings. If set to
+        false, only BERT embeddings will be used
     """
 
     try:
@@ -51,16 +56,49 @@ def segment_text(text_data: Union[dict, str, list], model: Literal[CommonModelNa
 
     if model == CommonModelName.MBERT:
         model = MBertModel(threshold=threshold)
-    elif model == CommonModelName.XLM:
-        model = XLMModel(threshold=threshold)
+    elif model == CommonModelName.SBERT:
+        model = SBertModel(threshold=threshold)
     else:
         raise Exception('Unknown model name!')
 
-    segments = topic_segmentation_bert(df=data, caption_col_name=CAPTION_COL_NAME, start_col_name=START_COL_NAME,
-                                       end_col_name=END_COL_NAME, model=model)
+    bert_segments, bert_features = topic_segmentation_bert(df=data,
+                                                           caption_col_name=CAPTION_COL_NAME,
+                                                           start_col_name=START_COL_NAME,
+                                                           end_col_name=END_COL_NAME,
+                                                           model=model)
 
-    segments = list(segments)
-    segments.reverse()
+    if not use_features:
+        segments = bert_segments
+    else:
+        side_window = (TextTilingHyperparameters().SMOOTHING_WINDOW +
+                       TextTilingHyperparameters().SENTENCE_COMPARISON_WINDOW)
+        bert_features = [min(bert_features)] * side_window + bert_features + [min(bert_features)] * side_window
+        bert_features = normalize(bert_features)
+
+        cue_phrases_features = get_cue_phrases_features(df=data, caption_col_name=CAPTION_COL_NAME)
+        overlap_features = get_overlap_features(df=data,
+                                                start_col_name=START_COL_NAME,
+                                                end_col_name=END_COL_NAME,
+                                                speaker_col_name=SPEAKER_COL_NAME)
+        speaker_change_features = get_speaker_change_features(df=data, speaker_col_name=SPEAKER_COL_NAME)
+        silence_features = get_silence_features(df=data, start_col_name=START_COL_NAME, end_col_name=END_COL_NAME)
+
+        bert_weights = [i * FEATURE_WEIGHTS[0] for i in bert_features]
+        silence_weights = [i * FEATURE_WEIGHTS[1] for i in silence_features]
+        overlap_weights = [i * FEATURE_WEIGHTS[2] for i in overlap_features]
+        speaker_change_weights = [i * FEATURE_WEIGHTS[3] for i in speaker_change_features]
+        cue_phrases_weights = [i * FEATURE_WEIGHTS[4] for i in cue_phrases_features]
+
+        zipped_features = zip(bert_weights, silence_weights, overlap_weights, speaker_change_weights,
+                              cue_phrases_weights)
+        total_features = normalize([sum(item) for item in zipped_features])
+        segments = features_to_prediction(total_features, threshold=threshold)
+
+    segments = sorted(segments)
+
+    if human_report:
+        make_human_report(input_df=data, output_filename=human_report, predictions=segments)
+
     report = []
     for i, _ in enumerate(segments):
         segment_start_time = data.iloc[segments[i]].starttime
@@ -155,11 +193,15 @@ def topic_segmentation_bert(
         meeting_duration,
         topic_segmentation_configs=topic_segmentation_configs,
     )
+
+    side_window = textiling_hyperparameters.SMOOTHING_WINDOW + textiling_hyperparameters.SENTENCE_COMPARISON_WINDOW
+    segments = [i + side_window for i in segments]
+
     if len(segments) == 0:
         segments = np.empty(0, int)
     segments = np.append(segments, 0)
 
-    return segments
+    return segments, depth_score_timeseries
 
 
 # FUNCTIONS THAT ARE USED IN `TOPIC_SEGMENTATION_BERT`
@@ -307,3 +349,40 @@ def arsort2(array1, array2):
 
     sorted_idx = x.argsort()[::-1]
     return x[sorted_idx], y[sorted_idx]
+
+
+def check_topic_break(topic_break: int, current_breaks: List[int]) -> bool:
+    min_segment_length = TopicSegmentationConfig().MIN_SEGMENT_LENGTH
+    for i in current_breaks:
+        if abs(i - topic_break) < min_segment_length:
+            return False
+    return True
+
+
+def features_to_prediction(features: List[float], threshold) -> List[str]:
+    sorted_features = sorted(list(enumerate(features)), key=lambda x: x[1], reverse=True)
+    topic_breaks = [0]
+    for i, feature in sorted_features:
+        if (feature > threshold and
+                check_topic_break(topic_break=i, current_breaks=topic_breaks)):
+            topic_breaks.append(i)
+
+    return topic_breaks
+
+
+def make_human_report(input_df: DataFrame, predictions: List[int], output_filename: str):
+    with open(output_filename, 'w') as f:
+        prev_speaker = None
+        predictions_chapter = 0
+        for index, row in input_df.iterrows():
+            if index in predictions:
+                if predictions_chapter != 0:
+                    f.write('\n\n')
+                predictions_chapter += 1
+                f.write(f'Chapter {predictions_chapter}\n')
+                prev_speaker = None
+
+            if row['speaker'] != prev_speaker:
+                f.write(f'\n{row["speaker"]}: ')
+                prev_speaker = row['speaker']
+            f.write(f'{row["text"]} ')
